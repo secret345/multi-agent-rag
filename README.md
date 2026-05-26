@@ -36,7 +36,32 @@
                 └──────────────┘
 ```
 
-## 核心功能
+## 架构设计
+
+### 数据流
+
+```
+用户提问 → Planner (意图识别) → Rewriter (查询重写/指代消解)
+                                      │
+                    ┌─────────────────┼──────────────────┐
+                    ▼                 ▼                  ▼
+              SQL Agent          RAG Agent          Doc Agent
+            (LLM→SQL→SQLite)  (BM25+FAISS+Rerank)  (多文档向量检索)
+                    │                 │                  │
+                    └─────────────────┴──────────────────┘
+                                      │
+                                      ▼
+                                  Writer (流式生成回答)
+```
+
+### 设计决策
+
+| 决策 | 选择 | 理由 |
+|------|------|------|
+| 工作流编排 | LangGraph StateGraph | 声明式路由，易于扩展新 Agent |
+| 检索策略 | BM25 + FAISS + LLM Rerank | 关键词+语义互补，Rerank 提升精度 |
+| SQL 生成 | LLM 生成 + 只读执行 | 支持灵活查询，安全校验防注入 |
+| 存储方案 | JSON 平文件 | 轻量级，适合单机部署和 Streamlit Cloud |
 
 ### 1. Multi-Agent 工作流
 - **Planner**: LLM 意图识别，自动路由到对应 Agent
@@ -63,6 +88,17 @@
 - 每个 Agent 节点记录耗时、输入输出
 - 调用链路追踪，日志持久化
 - RAG 评估脚本，量化检索准确率
+
+## 安全设计
+
+| 安全措施 | 实现方式 |
+|---------|---------|
+| SQL 注入防护 | `_validate_sql()` 只允许 SELECT 语句，禁止 DROP/DELETE/INSERT/UPDATE/ATTACH/UNION |
+| SQLite 只读模式 | `PRAGMA query_only = ON`，数据库连接以只读方式打开 |
+| 密码存储 | bcrypt 加盐哈希，自动迁移旧版 SHA-256 格式 |
+| CORS 策略 | 指定允许的源站，不使用通配符 |
+| XSRF 保护 | Streamlit 内置 XSRF 防护已启用 |
+| 用户数据隔离 | 每用户独立目录，聊天记录和 API Key 按用户隔离 |
 
 ## 技术栈
 
@@ -155,6 +191,20 @@ python -m eval.rag_eval
 | 混合检索 (BM25 + Vector + Reranker) | 100% (8/8) |
 
 > 销售数据查询由 Text-to-SQL Agent 处理，不经过 RAG 检索。
+
+## 测试
+
+```bash
+# 运行全部测试
+pytest tests/ -v
+
+# 运行特定测试
+pytest tests/test_sql_security.py -v   # SQL 安全校验
+pytest tests/test_auth.py -v           # 用户认证 + bcrypt
+pytest tests/test_workflow.py -v       # 工作流路由
+pytest tests/test_agents.py -v         # 各 Agent 单元测试
+pytest tests/test_chunking.py -v       # 文本分块
+```
 
 ## 部署
 

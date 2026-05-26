@@ -7,6 +7,20 @@ from llm import call_llm
 
 _db_conn = None
 
+_FORBIDDEN_KEYWORDS = re.compile(
+    r"\b(DROP|DELETE|INSERT|UPDATE|ALTER|ATTACH|DETACH|CREATE|REPLACE|TRUNCATE|EXEC|UNION|PRAGMA)\b",
+    re.IGNORECASE,
+)
+
+
+def _validate_sql(sql: str) -> None:
+    """Raise ValueError if the SQL is not a safe SELECT query."""
+    normalized = sql.strip().rstrip(";").strip()
+    if not normalized.upper().startswith("SELECT"):
+        raise ValueError(f"只允许 SELECT 查询，收到: {normalized[:60]}")
+    if _FORBIDDEN_KEYWORDS.search(normalized):
+        raise ValueError(f"SQL 包含禁止的关键字: {normalized[:60]}")
+
 
 def _get_db() -> sqlite3.Connection:
     global _db_conn
@@ -15,7 +29,8 @@ def _get_db() -> sqlite3.Connection:
         if not os.path.exists(csv_path):
             raise FileNotFoundError("数据文件不存在")
         df = pd.read_csv(csv_path)
-        _db_conn = sqlite3.connect(":memory:")
+        _db_conn = sqlite3.connect(":memory:", uri=True)
+        _db_conn.execute("PRAGMA query_only = ON")
         df.to_sql("sales", _db_conn, index=False, if_exists="replace")
     return _db_conn
 
@@ -44,6 +59,7 @@ def _generate_sql(query: str) -> str:
 - 使用标准 SQLite 语法
 - 如果需要聚合，使用 GROUP BY
 - 如果用户问的是"最好/最高/最多"等，使用 ORDER BY + LIMIT 1
+- 只允许 SELECT 语句，不要输出任何 INSERT/UPDATE/DELETE/DROP 等修改语句
 
 用户问题：{query}"""
 
@@ -81,10 +97,13 @@ def sql_agent(query: str) -> str:
     try:
         conn = _get_db()
         sql = _generate_sql(query)
+        _validate_sql(sql)
         cursor = conn.execute(sql)
         columns = [desc[0] for desc in cursor.description]
         rows = cursor.fetchall()
         return _summarize(query, sql, columns, rows)
+    except ValueError as e:
+        return f"SQL 安全校验失败：{e}"
     except sqlite3.OperationalError as e:
         return f"SQL 执行出错：{e}。请尝试换个方式提问。"
     except Exception as e:

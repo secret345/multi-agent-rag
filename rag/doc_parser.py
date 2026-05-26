@@ -7,7 +7,7 @@ def parse_txt(file_path: str) -> str:
 
 
 def parse_pdf(file_path: str) -> str:
-    from PyPDF2 import PdfReader
+    from pypdf import PdfReader
 
     reader = PdfReader(file_path)
     pages = []
