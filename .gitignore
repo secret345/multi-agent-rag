@@ -1,0 +1,13 @@
+.env
+__pycache__/
+*.pyc
+.venv/
+.idea/
+*.index
+*.chunks
+data/uploads/*
+!data/uploads/.gitkeep
+data/users.json
+data/chat_history.json
+data/trace.jsonl
+vectorstore/*.bm25

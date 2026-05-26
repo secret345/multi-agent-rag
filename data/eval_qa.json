@@ -1,0 +1,77 @@
+[
+  {
+    "question": "公司什么时候成立的",
+    "keywords": ["2010"],
+    "category": "knowledge"
+  },
+  {
+    "question": "公司总部在哪里",
+    "keywords": ["北京"],
+    "category": "knowledge"
+  },
+  {
+    "question": "公司有多少员工",
+    "keywords": ["5000"],
+    "category": "knowledge"
+  },
+  {
+    "question": "公司的研发基地在哪里",
+    "keywords": ["北京", "上海", "深圳"],
+    "category": "knowledge"
+  },
+  {
+    "question": "公司主要做什么产品",
+    "keywords": ["智能手机", "笔记本电脑", "平板电脑", "智能穿戴"],
+    "category": "knowledge"
+  },
+  {
+    "question": "2024年第一季度营收多少",
+    "keywords": ["50亿"],
+    "category": "knowledge"
+  },
+  {
+    "question": "公司的管理架构是什么样的",
+    "keywords": ["扁平化"],
+    "category": "knowledge"
+  },
+  {
+    "question": "AI团队做什么方向",
+    "keywords": ["自然语言处理", "计算机视觉", "推荐系统"],
+    "category": "knowledge"
+  },
+  {
+    "question": "手机在华北地区Q1销量多少",
+    "keywords": ["120"],
+    "category": "sales"
+  },
+  {
+    "question": "哪个产品卖得最好",
+    "keywords": ["耳机"],
+    "category": "sales"
+  },
+  {
+    "question": "华东地区平板的销售额是多少",
+    "keywords": ["299850", "319840", "339830"],
+    "category": "sales"
+  },
+  {
+    "question": "笔记本在华南地区每个月的销量",
+    "keywords": ["40", "55", "45"],
+    "category": "sales"
+  },
+  {
+    "question": "耳机的单价是多少",
+    "keywords": ["299"],
+    "category": "sales"
+  },
+  {
+    "question": "2月份所有产品总销量",
+    "keywords": [],
+    "category": "sales"
+  },
+  {
+    "question": "哪个地区手机卖得最多",
+    "keywords": ["华北"],
+    "category": "sales"
+  }
+]
