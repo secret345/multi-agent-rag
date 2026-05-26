@@ -1,9 +1,9 @@
 import hashlib
 import json
 import os
-from config import DATA_DIR
+from config import WRITABLE_DIR
 
-USERS_PATH = os.path.join(DATA_DIR, "users.json")
+USERS_PATH = os.path.join(WRITABLE_DIR, "users.json")
 
 
 def _load_users() -> dict:

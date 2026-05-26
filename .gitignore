@@ -11,3 +11,4 @@ data/users.json
 data/chat_history.json
 data/trace.jsonl
 vectorstore/*.bm25
+.streamlit/secrets.toml

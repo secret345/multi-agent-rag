@@ -16,4 +16,13 @@ LLM_MODEL = "qwen-max"
 EMBEDDING_MODEL = "text-embedding-v3"
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
-VECTORSTORE_DIR = os.path.join(os.path.dirname(__file__), "vectorstore")
+
+# Streamlit Cloud uses ephemeral filesystem; writable data goes to /tmp
+IS_CLOUD = os.environ.get("STREAMLIT_SHARING_MODE") == "true" or not os.access(
+    os.path.join(os.path.dirname(__file__), "data"), os.W_OK
+)
+WRITABLE_DIR = "/tmp/multi_agent_rag" if IS_CLOUD else DATA_DIR
+os.makedirs(WRITABLE_DIR, exist_ok=True)
+
+VECTORSTORE_DIR = os.path.join(WRITABLE_DIR, "vectorstore")
+os.makedirs(VECTORSTORE_DIR, exist_ok=True)

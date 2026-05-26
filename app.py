@@ -7,14 +7,14 @@ import os
 import re
 from graph.workflow import app_graph
 from agents.writer import writer_agent_stream
-from config import DATA_DIR, VECTORSTORE_DIR
+from config import DATA_DIR, WRITABLE_DIR, VECTORSTORE_DIR
 from rag.doc_indexer import build_doc_index
 from auth.user_auth import register_user, verify_user, reset_password, user_exists
 from auth.sms_service import generate_code, send_sms, verify_code
 
-UPLOADS_DIR = os.path.join(DATA_DIR, "uploads")
+UPLOADS_DIR = os.path.join(WRITABLE_DIR, "uploads")
 MANIFEST_PATH = os.path.join(UPLOADS_DIR, "manifest.json")
-CHAT_HISTORY_PATH = os.path.join(DATA_DIR, "chat_history.json")
+CHAT_HISTORY_PATH = os.path.join(WRITABLE_DIR, "chat_history.json")
 
 
 def load_json(path: str):
@@ -185,6 +185,15 @@ if not check_auth():
     st.stop()
 
 st.set_page_config(page_title="企业数据分析助手", page_icon="📊", layout="wide")
+
+# Auto-build knowledge index if missing (first deploy on Streamlit Cloud)
+from rag.retriever import _load as _load_retriever
+try:
+    _load_retriever()
+except FileNotFoundError:
+    with st.spinner("首次启动，正在构建知识库索引..."):
+        from rag.indexer import build_index
+        build_index()
 
 manifest = load_json(MANIFEST_PATH)
 
