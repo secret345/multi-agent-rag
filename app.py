@@ -187,13 +187,17 @@ if not check_auth():
 st.set_page_config(page_title="企业数据分析助手", page_icon="📊", layout="wide")
 
 # Auto-build knowledge index if missing (first deploy on Streamlit Cloud)
+from config import get_api_key
 from rag.retriever import _load as _load_retriever
 try:
     _load_retriever()
 except FileNotFoundError:
-    with st.spinner("首次启动，正在构建知识库索引..."):
-        from rag.indexer import build_index
-        build_index()
+    if get_api_key():
+        with st.spinner("首次启动，正在构建知识库索引..."):
+            from rag.indexer import build_index
+            build_index()
+    else:
+        st.warning("请先在侧边栏填入 DashScope API Key 以构建知识库索引")
 
 manifest = load_json(MANIFEST_PATH)
 
@@ -206,6 +210,15 @@ st.title("企业数据分析助手")
 st.caption(f"欢迎，{st.session_state.get('user_phone', '')}")
 
 with st.sidebar:
+    st.header("API 设置")
+    user_key = st.text_input(
+        "DashScope API Key（留空则使用系统默认）",
+        type="password",
+        key="user_api_key",
+        placeholder="sk-xxxxxxxx",
+    )
+
+    st.divider()
     st.header("文档上传")
     uploaded_files = st.file_uploader(
         "上传文档进行分析（支持多文件）",

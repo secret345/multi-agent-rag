@@ -1,18 +1,19 @@
 import time
 from dashscope import Generation
-from config import DASHSCOPE_API_KEY, LLM_MODEL
+from config import get_api_key, LLM_MODEL
 
 MAX_RETRIES = 3
 
 
 def call_llm(prompt: str) -> str:
-    if not DASHSCOPE_API_KEY:
-        raise ValueError("DASHSCOPE_API_KEY 未设置，请在 .env 文件中配置")
+    api_key = get_api_key()
+    if not api_key:
+        raise ValueError("DASHSCOPE_API_KEY 未设置，请在侧边栏填入或在 .env 文件中配置")
 
     for attempt in range(MAX_RETRIES):
         try:
             response = Generation.call(
-                api_key=DASHSCOPE_API_KEY,
+                api_key=api_key,
                 model=LLM_MODEL,
                 prompt=prompt,
             )
@@ -32,13 +33,14 @@ def call_llm(prompt: str) -> str:
 
 
 def call_llm_stream(prompt: str):
-    if not DASHSCOPE_API_KEY:
-        raise ValueError("DASHSCOPE_API_KEY 未设置")
+    api_key = get_api_key()
+    if not api_key:
+        raise ValueError("DASHSCOPE_API_KEY 未设置，请在侧边栏填入或在 .env 文件中配置")
 
     for attempt in range(MAX_RETRIES):
         try:
             responses = Generation.call(
-                api_key=DASHSCOPE_API_KEY,
+                api_key=api_key,
                 model=LLM_MODEL,
                 prompt=prompt,
                 stream=True,

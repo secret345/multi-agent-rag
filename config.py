@@ -15,6 +15,18 @@ if not DASHSCOPE_API_KEY:
 LLM_MODEL = "qwen-max"
 EMBEDDING_MODEL = "text-embedding-v3"
 
+
+def get_api_key() -> str:
+    """Return user-provided key from session state, or fall back to the global key."""
+    try:
+        import streamlit as st
+        user_key = st.session_state.get("user_api_key", "").strip()
+        if user_key:
+            return user_key
+    except Exception:
+        pass
+    return DASHSCOPE_API_KEY or ""
+
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 
 # Streamlit Cloud uses ephemeral filesystem; writable data goes to /tmp
