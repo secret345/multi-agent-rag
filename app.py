@@ -195,10 +195,14 @@ if not check_auth():
 
 st.set_page_config(page_title="企业数据分析助手", page_icon="📊", layout="wide")
 
-# Compute and cache user directory once per session
-if "user_data_dir" not in st.session_state:
-    phone = st.session_state.get("user_phone", "anonymous")
-    st.session_state.user_data_dir = os.path.join(WRITABLE_DIR, "users", phone)
+# Ensure user directory is set and belongs to the current user
+current_phone = st.session_state.get("user_phone", "anonymous")
+cached_owner = st.session_state.get("data_owner")
+user_changed = cached_owner != current_phone
+
+if user_changed:
+    st.session_state.data_owner = current_phone
+    st.session_state.user_data_dir = os.path.join(WRITABLE_DIR, "users", current_phone)
     os.makedirs(st.session_state.user_data_dir, exist_ok=True)
     os.makedirs(os.path.join(st.session_state.user_data_dir, "uploads"), exist_ok=True)
 
@@ -215,11 +219,11 @@ except FileNotFoundError:
     else:
         st.warning("请先在侧边栏填入 DashScope API Key 以构建知识库索引")
 
-manifest = load_json(_user_manifest_path())
-
-if "documents" not in st.session_state:
+# Reload documents and messages when user changes
+if user_changed or "documents" not in st.session_state:
+    manifest = load_json(_user_manifest_path())
     st.session_state.documents = manifest.get("documents", [])
-if "messages" not in st.session_state:
+if user_changed or "messages" not in st.session_state:
     st.session_state.messages = load_chat_history()
 
 st.title("企业数据分析助手")
@@ -289,8 +293,6 @@ with st.sidebar:
     if st.button("退出登录"):
         st.session_state.authenticated = False
         st.session_state.user_phone = ""
-        if "user_data_dir" in st.session_state:
-            del st.session_state.user_data_dir
         st.rerun()
 
 for msg in st.session_state.messages:
