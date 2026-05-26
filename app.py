@@ -289,6 +289,8 @@ with st.sidebar:
     if st.button("退出登录"):
         st.session_state.authenticated = False
         st.session_state.user_phone = ""
+        if "user_data_dir" in st.session_state:
+            del st.session_state.user_data_dir
         st.rerun()
 
 for msg in st.session_state.messages:
