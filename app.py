@@ -39,6 +39,18 @@ def _user_manifest_path() -> str:
     return os.path.join(_user_dir(), "manifest.json")
 
 
+def _user_settings_path() -> str:
+    return os.path.join(_user_dir(), "settings.json")
+
+
+def load_user_settings() -> dict:
+    return load_json(_user_settings_path())
+
+
+def save_user_settings(settings: dict):
+    save_json(_user_settings_path(), settings)
+
+
 def load_chat_history() -> list:
     return load_json(_user_chat_path()).get("messages", [])
 
@@ -226,6 +238,12 @@ if user_changed or "documents" not in st.session_state:
 if user_changed or "messages" not in st.session_state:
     st.session_state.messages = load_chat_history()
 
+# Load saved API key when user changes
+if user_changed:
+    settings = load_user_settings()
+    st.session_state.user_api_key = settings.get("api_key", "")
+    st.session_state.last_saved_api_key = settings.get("api_key", "")
+
 st.title("企业数据分析助手")
 st.caption(f"欢迎，{st.session_state.get('user_phone', '')}")
 
@@ -237,6 +255,11 @@ with st.sidebar:
         key="user_api_key",
         placeholder="sk-xxxxxxxx",
     )
+    # Auto-save API key when changed
+    current_key = st.session_state.get("user_api_key", "")
+    if current_key != st.session_state.get("last_saved_api_key", ""):
+        save_user_settings({"api_key": current_key})
+        st.session_state.last_saved_api_key = current_key
 
     st.divider()
     st.header("文档上传")
