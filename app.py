@@ -28,10 +28,7 @@ def save_json(path: str, data):
 
 
 def _user_dir() -> str:
-    phone = st.session_state.get("user_phone", "anonymous")
-    d = os.path.join(WRITABLE_DIR, "users", phone)
-    os.makedirs(d, exist_ok=True)
-    return d
+    return st.session_state.get("user_data_dir", os.path.join(WRITABLE_DIR, "users", "anonymous"))
 
 
 def _user_chat_path() -> str:
@@ -198,6 +195,13 @@ if not check_auth():
 
 st.set_page_config(page_title="企业数据分析助手", page_icon="📊", layout="wide")
 
+# Compute and cache user directory once per session
+if "user_data_dir" not in st.session_state:
+    phone = st.session_state.get("user_phone", "anonymous")
+    st.session_state.user_data_dir = os.path.join(WRITABLE_DIR, "users", phone)
+    os.makedirs(st.session_state.user_data_dir, exist_ok=True)
+    os.makedirs(os.path.join(st.session_state.user_data_dir, "uploads"), exist_ok=True)
+
 # Auto-build knowledge index if missing (first deploy on Streamlit Cloud)
 from config import get_api_key
 from rag.retriever import _load as _load_retriever
@@ -243,9 +247,7 @@ with st.sidebar:
             if uploaded_file.name in existing_names:
                 continue
             with st.spinner(f"正在索引 {uploaded_file.name}..."):
-                user_uploads = os.path.join(_user_dir(), "uploads")
-                os.makedirs(user_uploads, exist_ok=True)
-                save_path = os.path.join(user_uploads, uploaded_file.name)
+                save_path = os.path.join(_user_dir(), "uploads", uploaded_file.name)
                 with open(save_path, "wb") as f:
                     f.write(uploaded_file.getbuffer())
                 index_id = f"doc_{uuid.uuid4().hex[:8]}"
