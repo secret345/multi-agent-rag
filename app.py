@@ -12,9 +12,6 @@ from rag.doc_indexer import build_doc_index
 from auth.user_auth import register_user, verify_user, reset_password, user_exists
 from auth.sms_service import generate_code, send_sms, verify_code
 
-UPLOADS_DIR = os.path.join(WRITABLE_DIR, "uploads")
-MANIFEST_PATH = os.path.join(UPLOADS_DIR, "manifest.json")
-CHAT_HISTORY_PATH = os.path.join(WRITABLE_DIR, "chat_history.json")
 
 
 def load_json(path: str):
@@ -30,12 +27,27 @@ def save_json(path: str, data):
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
+def _user_dir() -> str:
+    phone = st.session_state.get("user_phone", "anonymous")
+    d = os.path.join(WRITABLE_DIR, "users", phone)
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
+def _user_chat_path() -> str:
+    return os.path.join(_user_dir(), "chat_history.json")
+
+
+def _user_manifest_path() -> str:
+    return os.path.join(_user_dir(), "manifest.json")
+
+
 def load_chat_history() -> list:
-    return load_json(CHAT_HISTORY_PATH).get("messages", [])
+    return load_json(_user_chat_path()).get("messages", [])
 
 
 def save_chat_history(messages: list):
-    save_json(CHAT_HISTORY_PATH, {"messages": messages})
+    save_json(_user_chat_path(), {"messages": messages})
 
 
 def render_message(msg: dict):
@@ -199,7 +211,7 @@ except FileNotFoundError:
     else:
         st.warning("请先在侧边栏填入 DashScope API Key 以构建知识库索引")
 
-manifest = load_json(MANIFEST_PATH)
+manifest = load_json(_user_manifest_path())
 
 if "documents" not in st.session_state:
     st.session_state.documents = manifest.get("documents", [])
@@ -231,8 +243,9 @@ with st.sidebar:
             if uploaded_file.name in existing_names:
                 continue
             with st.spinner(f"正在索引 {uploaded_file.name}..."):
-                save_path = os.path.join(UPLOADS_DIR, uploaded_file.name)
-                os.makedirs(UPLOADS_DIR, exist_ok=True)
+                user_uploads = os.path.join(_user_dir(), "uploads")
+                os.makedirs(user_uploads, exist_ok=True)
+                save_path = os.path.join(user_uploads, uploaded_file.name)
                 with open(save_path, "wb") as f:
                     f.write(uploaded_file.getbuffer())
                 index_id = f"doc_{uuid.uuid4().hex[:8]}"
@@ -243,7 +256,7 @@ with st.sidebar:
             })
             existing_names.add(uploaded_file.name)
             st.success(f"'{uploaded_file.name}' 索引完成")
-        save_json(MANIFEST_PATH, {"documents": st.session_state.documents})
+        save_json(_user_manifest_path(), {"documents": st.session_state.documents})
 
     if st.session_state.documents:
         st.subheader("已上传文档")
@@ -253,7 +266,7 @@ with st.sidebar:
                 st.caption(doc["filename"])
             with col2:
                 if st.button("x", key=f"del_{i}"):
-                    upload_path = os.path.join(UPLOADS_DIR, doc["filename"])
+                    upload_path = os.path.join(_user_dir(), "uploads", doc["filename"])
                     if os.path.exists(upload_path):
                         os.remove(upload_path)
                     for ext in [".index", ".chunks"]:
@@ -261,7 +274,7 @@ with st.sidebar:
                         if os.path.exists(p):
                             os.remove(p)
                     st.session_state.documents.pop(i)
-                    save_json(MANIFEST_PATH, {"documents": st.session_state.documents})
+                    save_json(_user_manifest_path(), {"documents": st.session_state.documents})
                     st.rerun()
 
     st.divider()
