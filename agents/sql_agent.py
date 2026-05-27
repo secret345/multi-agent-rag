@@ -15,11 +15,17 @@ _FORBIDDEN_KEYWORDS = re.compile(
 
 def _validate_sql(sql: str) -> None:
     """Raise ValueError if the SQL is not a safe SELECT query."""
-    normalized = sql.strip().rstrip(";").strip()
+    # Strip inline comments (/* ... */) and line comments (-- ...)
+    cleaned = re.sub(r"/\*.*?\*/", " ", sql, flags=re.DOTALL)
+    cleaned = re.sub(r"--[^\n]*", " ", cleaned)
+    normalized = cleaned.strip().rstrip(";").strip()
     if not normalized.upper().startswith("SELECT"):
         raise ValueError(f"只允许 SELECT 查询，收到: {normalized[:60]}")
     if _FORBIDDEN_KEYWORDS.search(normalized):
         raise ValueError(f"SQL 包含禁止的关键字: {normalized[:60]}")
+    # Reject multiple statements (semicolons in the middle)
+    if ";" in normalized:
+        raise ValueError("不允许执行多条 SQL 语句")
 
 
 def _get_db() -> sqlite3.Connection:

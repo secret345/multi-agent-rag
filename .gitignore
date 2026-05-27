@@ -10,5 +10,6 @@ data/uploads/*
 data/users.json
 data/chat_history.json
 data/trace.jsonl
-vectorstore/*.bm25
+vectorstore/
+mysql_data/
 .streamlit/secrets.toml

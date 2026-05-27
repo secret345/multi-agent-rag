@@ -1,4 +1,6 @@
 import streamlit as st
+st.set_page_config(page_title="企业数据分析助手", page_icon="📊", layout="wide")
+
 import pandas as pd
 import plotly.express as px
 import uuid
@@ -11,52 +13,156 @@ from config import DATA_DIR, WRITABLE_DIR, VECTORSTORE_DIR
 from rag.doc_indexer import build_doc_index
 from auth.user_auth import register_user, verify_user, reset_password, user_exists
 from auth.sms_service import generate_code, send_sms, verify_code
+from db import get_conn, init_db
+
+try:
+    init_db()
+except Exception:
+    pass
 
 
-
-def load_json(path: str):
-    if os.path.exists(path):
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return {}
-
-
-def save_json(path: str, data):
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+def _sanitize_filename(name: str) -> str:
+    """Sanitize uploaded filename to prevent path traversal."""
+    name = os.path.basename(name)
+    name = name.replace("..", "")
+    if not name or name.startswith("."):
+        name = "unnamed"
+    return name
 
 
 def _user_dir() -> str:
     return st.session_state.get("user_data_dir", os.path.join(WRITABLE_DIR, "users", "anonymous"))
 
 
-def _user_chat_path() -> str:
-    return os.path.join(_user_dir(), "chat_history.json")
-
-
-def _user_manifest_path() -> str:
-    return os.path.join(_user_dir(), "manifest.json")
-
-
-def _user_settings_path() -> str:
-    return os.path.join(_user_dir(), "settings.json")
-
-
 def load_user_settings() -> dict:
-    return load_json(_user_settings_path())
+    phone = st.session_state.get("user_phone", "")
+    if not phone:
+        return {}
+    try:
+        conn = get_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT settings FROM user_settings WHERE phone=%s", (phone,))
+                row = cur.fetchone()
+                return row["settings"] if row else {}
+        finally:
+            conn.close()
+    except Exception:
+        return {}
 
 
 def save_user_settings(settings: dict):
-    save_json(_user_settings_path(), settings)
+    phone = st.session_state.get("user_phone", "")
+    if not phone:
+        return
+    try:
+        conn = get_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO user_settings (phone, settings) VALUES (%s, %s) "
+                    "ON DUPLICATE KEY UPDATE settings=VALUES(settings)",
+                    (phone, json.dumps(settings, ensure_ascii=False)),
+                )
+            conn.commit()
+        finally:
+            conn.close()
+    except Exception:
+        pass
 
 
 def load_chat_history() -> list:
-    return load_json(_user_chat_path()).get("messages", [])
+    phone = st.session_state.get("user_phone", "")
+    if not phone:
+        return []
+    try:
+        conn = get_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT messages FROM chat_history WHERE phone=%s", (phone,))
+                row = cur.fetchone()
+                return row["messages"] if row else []
+        finally:
+            conn.close()
+    except Exception:
+        return []
 
 
 def save_chat_history(messages: list):
-    save_json(_user_chat_path(), {"messages": messages})
+    phone = st.session_state.get("user_phone", "")
+    if not phone:
+        return
+    try:
+        conn = get_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO chat_history (phone, messages) VALUES (%s, %s) "
+                    "ON DUPLICATE KEY UPDATE messages=VALUES(messages)",
+                    (phone, json.dumps(messages, ensure_ascii=False)),
+                )
+            conn.commit()
+        finally:
+            conn.close()
+    except Exception:
+        pass
+
+
+def load_user_documents() -> list:
+    phone = st.session_state.get("user_phone", "")
+    if not phone:
+        return []
+    try:
+        conn = get_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT index_id, filename FROM user_documents WHERE phone=%s",
+                    (phone,),
+                )
+                return cur.fetchall()
+        finally:
+            conn.close()
+    except Exception:
+        return []
+
+
+def save_user_document(index_id: str, filename: str):
+    phone = st.session_state.get("user_phone", "")
+    if not phone:
+        return
+    try:
+        conn = get_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO user_documents (phone, index_id, filename) VALUES (%s, %s, %s)",
+                    (phone, index_id, filename),
+                )
+            conn.commit()
+        finally:
+            conn.close()
+    except Exception:
+        pass
+
+
+def delete_user_document(index_id: str):
+    phone = st.session_state.get("user_phone", "")
+    if not phone:
+        return
+    try:
+        conn = get_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "DELETE FROM user_documents WHERE phone=%s AND index_id=%s",
+                    (phone, index_id),
+                )
+            conn.commit()
+        finally:
+            conn.close()
+    except Exception:
+        pass
 
 
 def render_message(msg: dict):
@@ -150,11 +256,14 @@ def auth_page():
                     st.error("该手机号未注册")
                 else:
                     code = generate_code(reset_phone)
-                    send_sms(reset_phone, code)
-                    st.session_state.reset_phone = reset_phone
-                    st.session_state.reset_step = 2
-                    st.success("验证码已发送（模拟模式，查看控制台）")
-                    st.rerun()
+                    if code is None:
+                        st.error("发送过于频繁，请稍后再试")
+                    else:
+                        send_sms(reset_phone, code)
+                        st.session_state.reset_phone = reset_phone
+                        st.session_state.reset_step = 2
+                        st.success("验证码已发送（模拟模式，查看控制台）")
+                        st.rerun()
 
         elif st.session_state.reset_step == 2:
             st.info(f"验证码已发送至 {st.session_state.reset_phone}")
@@ -172,8 +281,11 @@ def auth_page():
             with col2:
                 if st.button("重新发送", key="btn_resend"):
                     code = generate_code(st.session_state.reset_phone)
-                    send_sms(st.session_state.reset_phone, code)
-                    st.success("验证码已重新发送")
+                    if code is None:
+                        st.error("发送过于频繁，请稍后再试")
+                    else:
+                        send_sms(st.session_state.reset_phone, code)
+                        st.success("验证码已重新发送")
 
         elif st.session_state.reset_step == 3:
             new_pwd = st.text_input("新密码", type="password", key="new_pwd")
@@ -205,8 +317,6 @@ def check_auth():
 if not check_auth():
     st.stop()
 
-st.set_page_config(page_title="企业数据分析助手", page_icon="📊", layout="wide")
-
 # Ensure user directory is set and belongs to the current user
 current_phone = st.session_state.get("user_phone", "anonymous")
 cached_owner = st.session_state.get("data_owner")
@@ -233,8 +343,7 @@ except FileNotFoundError:
 
 # Reload documents and messages when user changes
 if user_changed or "documents" not in st.session_state:
-    manifest = load_json(_user_manifest_path())
-    st.session_state.documents = manifest.get("documents", [])
+    st.session_state.documents = load_user_documents()
 if user_changed or "messages" not in st.session_state:
     st.session_state.messages = load_chat_history()
 
@@ -271,21 +380,22 @@ with st.sidebar:
     if uploaded_files:
         existing_names = {d["filename"] for d in st.session_state.documents}
         for uploaded_file in uploaded_files:
-            if uploaded_file.name in existing_names:
+            safe_name = _sanitize_filename(uploaded_file.name)
+            if safe_name in existing_names:
                 continue
-            with st.spinner(f"正在索引 {uploaded_file.name}..."):
-                save_path = os.path.join(_user_dir(), "uploads", uploaded_file.name)
+            with st.spinner(f"正在索引 {safe_name}..."):
+                save_path = os.path.join(_user_dir(), "uploads", safe_name)
                 with open(save_path, "wb") as f:
                     f.write(uploaded_file.getbuffer())
                 index_id = f"doc_{uuid.uuid4().hex[:8]}"
                 build_doc_index(save_path, index_id)
             st.session_state.documents.append({
                 "index_id": index_id,
-                "filename": uploaded_file.name,
+                "filename": safe_name,
             })
-            existing_names.add(uploaded_file.name)
-            st.success(f"'{uploaded_file.name}' 索引完成")
-        save_json(_user_manifest_path(), {"documents": st.session_state.documents})
+            existing_names.add(safe_name)
+            save_user_document(index_id, safe_name)
+            st.success(f"'{safe_name}' 索引完成")
 
     if st.session_state.documents:
         st.subheader("已上传文档")
@@ -302,8 +412,8 @@ with st.sidebar:
                         p = os.path.join(VECTORSTORE_DIR, f"{doc['index_id']}{ext}")
                         if os.path.exists(p):
                             os.remove(p)
+                    delete_user_document(doc["index_id"])
                     st.session_state.documents.pop(i)
-                    save_json(_user_manifest_path(), {"documents": st.session_state.documents})
                     st.rerun()
 
     st.divider()
