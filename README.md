@@ -19,16 +19,16 @@
 │  (rewriter) │  → "那笔记本呢" → "笔记本销量是多少"
 └──────┬──────┘
        │
-       ├─────────────────┬──────────────────┐
-       ▼                 ▼                  ▼
-┌─────────────┐  ┌──────────────┐  ┌───────────────┐
-│  SQL Agent  │  │  RAG Agent   │  │  Doc Agent    │
-│             │  │              │  │               │
-│ LLM→SQL     │  │ BM25 + FAISS │  │ 多文档向量检索   │
-│ sqlite3执行  │  │ + Reranker   │  │ + Reranker    │
-└──────┬──────┘  └──────┬───────┘  └───────┬───────┘
-       │                │                  │
-       └────────────────┴──────────────────┘
+       ├────────────────┬─────────────────┐
+       ▼                ▼                 ▼
+┌─────────────┐  ┌──────────────┐  ┌──────────────┐
+│  SQL Agent  │  │  RAG Agent   │  │  Doc Agent   │
+│             │  │              │  │              │
+│ LLM→SQL     │  │ BM25 + FAISS │  │ 多文档向量检索  │
+│ sqlite3执行  │  │ + Reranker   │  │ + Reranker   │
+└──────┬──────┘  └──────┬───────┘  └──────┬───────┘
+       │                │                 │
+       └────────────────┴─────────────────┘
                         │
                         ▼
                 ┌──────────────┐
@@ -61,7 +61,7 @@
 | 工作流编排 | LangGraph StateGraph | 声明式路由，易于扩展新 Agent |
 | 检索策略 | BM25 + FAISS + LLM Rerank | 关键词+语义互补，Rerank 提升精度 |
 | SQL 生成 | LLM 生成 + 只读执行 | 支持灵活查询，安全校验防注入 |
-| 存储方案 | JSON 平文件 | 轻量级，适合单机部署和 Streamlit Cloud |
+| 存储方案 | MySQL | 数据持久化，重启不丢失，支持多用户并发 |
 
 ### 1. Multi-Agent 工作流
 - **Planner**: LLM 意图识别，自动路由到对应 Agent
@@ -93,12 +93,12 @@
 
 | 安全措施 | 实现方式 |
 |---------|---------|
-| SQL 注入防护 | `_validate_sql()` 只允许 SELECT 语句，禁止 DROP/DELETE/INSERT/UPDATE/ATTACH/UNION |
+| SQL 注入防护 | `_validate_sql()` 只允许 SELECT 语句，去除注释后校验，禁止多语句执行 |
 | SQLite 只读模式 | `PRAGMA query_only = ON`，数据库连接以只读方式打开 |
 | 密码存储 | bcrypt 加盐哈希，自动迁移旧版 SHA-256 格式 |
-| CORS 策略 | 指定允许的源站，不使用通配符 |
-| XSRF 保护 | Streamlit 内置 XSRF 防护已启用 |
-| 用户数据隔离 | 每用户独立目录，聊天记录和 API Key 按用户隔离 |
+| 验证码安全 | `secrets` 密码学安全随机数，速率限制（每分钟 3 次发送，5 次验证尝试） |
+| 文件上传安全 | 文件名过滤路径穿越字符，`os.path.basename` 清洗 |
+| 用户数据隔离 | MySQL 按用户隔离，聊天记录、文档、API Key 独立存储 |
 
 ## 技术栈
 
@@ -111,6 +111,7 @@
 | 前端 | Streamlit |
 | 后端 | FastAPI |
 | 数据分析 | Pandas + sqlite3 |
+| 数据存储 | MySQL 8.0 |
 
 ## 项目结构
 
@@ -148,6 +149,7 @@
 ├── app.py                  # Streamlit 前端
 ├── main.py                 # FastAPI 后端
 ├── llm.py                  # LLM 调用（含重试 + 流式）
+├── db.py                   # MySQL 数据库连接
 └── config.py               # 配置
 ```
 
@@ -161,7 +163,7 @@ pip install -r requirements.txt
 ### 2. 配置环境变量
 ```bash
 cp .env.example .env
-# 编辑 .env，填入你的 DashScope API Key
+# 编辑 .env，填入 DashScope API Key 和 MySQL 连接信息
 ```
 
 ### 3. 构建知识库索引
@@ -221,3 +223,8 @@ DASHSCOPE_API_KEY = "your_key"
 | 变量 | 说明 |
 |------|------|
 | `DASHSCOPE_API_KEY` | 阿里云 DashScope API Key |
+| `MYSQL_HOST` | MySQL 主机地址（默认 localhost）|
+| `MYSQL_PORT` | MySQL 端口（默认 3306）|
+| `MYSQL_USER` | MySQL 用户名（默认 root）|
+| `MYSQL_PASSWORD` | MySQL 密码 |
+| `MYSQL_DATABASE` | MySQL 数据库名（默认 multi_agent_rag）|
