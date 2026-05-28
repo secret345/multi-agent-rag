@@ -44,7 +44,10 @@ def load_user_settings() -> dict:
             with conn.cursor() as cur:
                 cur.execute("SELECT settings FROM user_settings WHERE phone=%s", (phone,))
                 row = cur.fetchone()
-                return row["settings"] if row else {}
+                if not row or not row["settings"]:
+                    return {}
+                s = row["settings"]
+                return json.loads(s) if isinstance(s, str) else s
         finally:
             conn.close()
     except Exception:
@@ -81,7 +84,10 @@ def load_chat_history() -> list:
             with conn.cursor() as cur:
                 cur.execute("SELECT messages FROM chat_history WHERE phone=%s", (phone,))
                 row = cur.fetchone()
-                return row["messages"] if row else []
+                if not row or not row["messages"]:
+                    return []
+                m = row["messages"]
+                return json.loads(m) if isinstance(m, str) else m
         finally:
             conn.close()
     except Exception:
