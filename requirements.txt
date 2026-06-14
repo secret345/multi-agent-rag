@@ -8,9 +8,12 @@ numpy>=1.26.0
 python-dotenv>=1.0.0
 pypdf>=3.0.0
 python-docx>=1.1.0
-streamlit>=1.32.0
+
 plotly>=5.18.0
 jieba>=0.42.0
 bcrypt>=4.0.0
 pymysql>=1.1.0
+PyJWT>=2.8.0
+python-multipart>=0.0.6
+sentence-transformers>=3.0.0
 pytest>=8.0.0

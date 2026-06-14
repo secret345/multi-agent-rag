@@ -31,7 +31,7 @@ def get_chunks() -> list[str]:
     return _chunks
 
 
-def rag_search(query: str, top_k: int = 3) -> list[str]:
+def rag_search(query: str, top_k: int = 3, return_scores: bool = False):
     global _index, _chunks
 
     if _index is None:
@@ -45,6 +45,9 @@ def rag_search(query: str, top_k: int = 3) -> list[str]:
     results = []
     for dist, idx in zip(distances[0], indices[0]):
         if 0 <= idx < len(_chunks) and dist < DISTANCE_THRESHOLD:
-            results.append(_chunks[idx].strip())
+            if return_scores:
+                results.append((_chunks[idx].strip(), float(dist)))
+            else:
+                results.append(_chunks[idx].strip())
 
     return results

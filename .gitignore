@@ -12,4 +12,6 @@ data/chat_history.json
 data/trace.jsonl
 vectorstore/
 mysql_data/
-.streamlit/secrets.toml
+.streamlit/
+frontend/node_modules/
+frontend/dist/
